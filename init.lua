@@ -88,6 +88,10 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
+vim.keymap.set('n', '<leader>t', ':silent !tmux new-window -c "$PWD"<CR>', { noremap = true, silent = true })
+
+vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { desc = 'LSP Rename Symbol' })
+
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
 -- is not what someone will guess without a bit more experience.
@@ -163,6 +167,7 @@ rtp:prepend(lazypath)
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'NMAC427/guess-indent.nvim', -- Detect tabstop and shiftwidth automatically
+  'pmizio/typescript-tools.nvim', -- TypeScript integration
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -170,6 +175,14 @@ require('lazy').setup({
   --
   -- Use `opts = {}` to automatically pass options to a plugin's `setup()` function, forcing the plugin to be loaded.
   --
+  -- {
+  --  'jaredgorski/Mies.vim',
+  --  priority = 1000,
+  --  config = function()
+  --    -- Set the colorscheme to Mies.vim
+  --    vim.cmd [[colorscheme mies]]
+  --  end,
+  -- },
 
   -- Alternatively, use `config = function() ... end` for full control over the configuration.
   -- If you prefer to call `setup` explicitly, use:
@@ -600,7 +613,7 @@ require('lazy').setup({
         -- Some languages (like typescript) have entire language plugins that can be useful:
         --    https://github.com/pmizio/typescript-tools.nvim
         --
-        ts_ls = {},
+        -- ts_ls = {},
 
         lua_ls = {
           -- cmd = { ... },
@@ -635,6 +648,7 @@ require('lazy').setup({
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
         'prettier', -- Used to format TypeScript and JavaScript
+        'typescript-language-server', -- Required for typescript-tools.nvim
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -650,6 +664,26 @@ require('lazy').setup({
             server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
             require('lspconfig')[server_name].setup(server)
           end,
+        },
+      }
+    end,
+  },
+  { -- TypeScript integration
+    'pmizio/typescript-tools.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
+    config = function()
+      require('typescript-tools').setup {
+        settings = {
+          separate_diagnostic_server = true,
+          publish_diagnostic_on = 'insert_leave',
+          tsserver_plugins = {},
+          tsserver_max_memory = 'auto',
+          tsserver_format_options = {},
+          tsserver_file_preferences = {
+            includeInlayParameterNameHints = 'all',
+            includeCompletionsForModuleExports = true,
+            quotePreference = 'auto',
+          },
         },
       }
     end,
@@ -807,7 +841,7 @@ require('lazy').setup({
     priority = 1000, -- Make sure to load this before all the other start plugins.
     config = function()
       require('black-metal').setup {
-        theme = 'bathory', -- Choose one of: bathory, burzum, dark-funeral, darkthrone, emperor, gorgoroth, immortal, impaled-nazarene, khold, marduk, mayhem, nile, taake, thyrfing, venom, windir
+        theme = 'darkthrone', -- Choose one of: bathory, burzum, dark-funeral, darkthrone, emperor, gorgoroth, immortal, impaled-nazarene, khold, marduk, mayhem, nile, taake, thyrfing, venom, windir
         variant = 'dark', -- Set to 'dark', 'light', or use vim.o.background
         alt_bg = false, -- Use an alternate, lighter background
       }
