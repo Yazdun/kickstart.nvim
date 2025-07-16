@@ -88,17 +88,13 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
-vim.keymap.set('n', '<leader>t', ':silent !tmux new-window -c "$PWD"<CR>', { noremap = true, silent = true })
-
 vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { desc = 'LSP Rename Symbol' })
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
 -- is not what someone will guess without a bit more experience.
 --
--- NOTE: This won't work in all terminal emulators/tmux/etc. Try your own mapping
--- or just use <C-\><C-n> to exit terminal mode
-vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
+vim.keymap.set('t', '<C-x>', '<C-\\><C-n>', { desc = 'Exit terminal mode with Ctrl+x' })
 
 -- TIP: Disable arrow keys in normal mode
 -- vim.keymap.set('n', '<left>', '<cmd>echo "Use h to move!!"<CR>')
@@ -117,6 +113,56 @@ vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper win
 
 -- File browser keymap
 vim.keymap.set('n', '<leader>fb', ':Telescope file_browser<CR>', { desc = '[F]ile [B]rowser' })
+
+-- Track the terminal buffer and window IDs
+local term_bufnr = nil
+local term_winid = nil
+
+-- Open or restore terminal
+vim.keymap.set('n', '<leader>t', function()
+  -- If buffer exists and is valid
+  if term_bufnr and vim.api.nvim_buf_is_valid(term_bufnr) then
+    -- If it's already visible in a window, jump to it
+    local win_id = vim.fn.bufwinid(term_bufnr)
+    if win_id ~= -1 then
+      vim.api.nvim_set_current_win(win_id)
+    else
+      -- Otherwise, open the buffer in a split
+      vim.cmd 'botright vsplit'
+      vim.api.nvim_win_set_buf(0, term_bufnr)
+    end
+    term_winid = vim.api.nvim_get_current_win()
+  else
+    -- Open a new terminal
+    vim.cmd 'botright vsplit | terminal'
+    term_bufnr = vim.api.nvim_get_current_buf()
+    term_winid = vim.api.nvim_get_current_win()
+  end
+  vim.cmd 'startinsert'
+end, { desc = 'Open or restore terminal' })
+
+-- Hide terminal window without killing the session
+vim.keymap.set({ 'n', 't' }, '<leader>h', function()
+  if term_winid and vim.api.nvim_win_is_valid(term_winid) then
+    vim.cmd 'stopinsert'
+    vim.api.nvim_win_close(term_winid, false) -- false = do not wipe buffer
+    term_winid = nil
+  end
+end, { desc = 'Hide terminal (preserve buffer)' })
+
+-- Toggle between terminal and editor
+vim.keymap.set({ 'n', 't' }, '<C-\\>', function()
+  local cur_win = vim.api.nvim_get_current_win()
+  if term_winid and vim.api.nvim_win_is_valid(term_winid) then
+    if cur_win == term_winid then
+      vim.cmd 'stopinsert'
+      vim.cmd 'wincmd p' -- Go to previous window
+    else
+      vim.api.nvim_set_current_win(term_winid)
+      vim.cmd 'startinsert'
+    end
+  end
+end, { desc = 'Toggle between terminal and editor' })
 
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
 -- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
@@ -167,7 +213,6 @@ rtp:prepend(lazypath)
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'NMAC427/guess-indent.nvim', -- Detect tabstop and shiftwidth automatically
-  'pmizio/typescript-tools.nvim', -- TypeScript integration
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -212,69 +257,24 @@ require('lazy').setup({
     },
   },
 
-  -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
-  --
-  -- This is often very useful to both group configuration, as well as handle
-  -- lazy loading plugins that don't need to be loaded immediately at startup.
-  --
-  -- For example, in the following configuration, we use:
-  --  event = 'VimEnter'
-  --
-  -- which loads which-key before all the UI elements are loaded. Events can be
-  -- normal autocommands events (`:help autocmd-events`).
-  --
-  -- Then, because we use the `opts` key (recommended), the configuration runs
-  -- after the plugin has been loaded as `require(MODULE).setup(opts)`.
-
-  { -- Useful plugin to show you pending keybinds.
-    'folke/which-key.nvim',
-    event = 'VimEnter', -- Sets the loading event to 'VimEnter'
+  {
+    'folke/trouble.nvim',
     opts = {
-      -- delay between pressing a key and opening which-key (milliseconds)
-      -- this setting is independent of vim.o.timeoutlen
-      delay = 0,
-      icons = {
-        -- set icon mappings to true if you have a Nerd Font
-        mappings = vim.g.have_nerd_font,
-        -- If you are using a Nerd Font: set icons.keys to an empty table which will use the
-        -- default which-key.nvim defined Nerd Font icons, otherwise define a string table
-        keys = vim.g.have_nerd_font and {} or {
-          Up = '<Up> ',
-          Down = '<Down> ',
-          Left = '<Left> ',
-          Right = '<Right> ',
-          C = '<C-…> ',
-          M = '<M-…> ',
-          D = '<D-…> ',
-          S = '<S-…> ',
-          CR = '<CR> ',
-          Esc = '<Esc> ',
-          ScrollWheelDown = '<ScrollWheelDown> ',
-          ScrollWheelUp = '<ScrollWheelUp> ',
-          NL = '<NL> ',
-          BS = '<BS> ',
-          Space = '<Space> ',
-          Tab = '<Tab> ',
-          F1 = '<F1>',
-          F2 = '<F2>',
-          F3 = '<F3>',
-          F4 = '<F4>',
-          F5 = '<F5>',
-          F6 = '<F6>',
-          F7 = '<F7>',
-          F8 = '<F8>',
-          F9 = '<F9>',
-          F10 = '<F10>',
-          F11 = '<F11>',
-          F12 = '<F12>',
-        },
+      -- Configure the window to open vertically
+      win = {
+        position = 'right', -- Vertical tab on the right side
+        size = { width = 100 }, -- Set a reasonable width (adjust as needed)
       },
-
-      -- Document existing key chains
-      spec = {
-        { '<leader>s', group = '[S]earch' },
-        { '<leader>t', group = '[T]oggle' },
-        { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
+      -- Auto-focus on open and restore focus on close
+      auto_focus = true, -- Focus the Trouble window when opened
+      restore = true, -- Restore focus to the previous window when closed
+    },
+    cmd = 'Trouble',
+    keys = {
+      {
+        '<leader>xx',
+        '<cmd>Trouble diagnostics toggle<cr>',
+        desc = 'Diagnostics (Trouble)',
       },
     },
   },
@@ -392,6 +392,48 @@ require('lazy').setup({
     end,
   },
 
+  {
+    'pmizio/typescript-tools.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
+    opts = {
+      settings = {
+        -- Enable features like "Organize Imports" and "Go to Source Definition"
+        tsserver_plugins = {},
+        tsserver_file_preferences = {
+          includeInlayParameterNameHints = 'all',
+          includeInlayFunctionLikeReturnTypeHints = true,
+          includeInlayVariableTypeHints = true,
+        },
+      },
+    },
+  },
+
+  {
+    'nvim-treesitter/nvim-treesitter-context',
+    dependencies = { 'nvim-treesitter/nvim-treesitter' },
+    opts = {
+      enable = true,
+      max_lines = 3, -- Show up to 3 lines of context
+      multiline_threshold = 1, -- Show context for single-line constructs
+    },
+  },
+
+  {
+    'windwp/nvim-ts-autotag',
+    dependencies = { 'nvim-treesitter/nvim-treesitter' },
+    config = function()
+      require('nvim-ts-autotag').setup()
+    end,
+  },
+  -- Auto pair brackets
+  {
+    'windwp/nvim-autopairs',
+    lazy = false,
+    config = function()
+      require('nvim-autopairs').setup {}
+    end,
+  },
+
   -- LSP Plugins
   {
     -- `lazydev` configures Lua LSP for your Neovim config, runtime and plugins
@@ -422,6 +464,7 @@ require('lazy').setup({
       -- Allows extra capabilities provided by blink.cmp
       'saghen/blink.cmp',
     },
+
     config = function()
       -- Brief aside: **What is LSP?**
       --
@@ -668,27 +711,6 @@ require('lazy').setup({
       }
     end,
   },
-  { -- TypeScript integration
-    'pmizio/typescript-tools.nvim',
-    dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
-    config = function()
-      require('typescript-tools').setup {
-        settings = {
-          separate_diagnostic_server = true,
-          publish_diagnostic_on = 'insert_leave',
-          tsserver_plugins = {},
-          tsserver_max_memory = 'auto',
-          tsserver_format_options = {},
-          tsserver_file_preferences = {
-            includeInlayParameterNameHints = 'all',
-            includeCompletionsForModuleExports = true,
-            quotePreference = 'auto',
-          },
-        },
-      }
-    end,
-  },
-
   { -- Autoformat
     'stevearc/conform.nvim',
     event = { 'BufWritePre' },
@@ -731,7 +753,6 @@ require('lazy').setup({
       },
     },
   },
-
   { -- Autocompletion
     'saghen/blink.cmp',
     event = 'VimEnter',
@@ -761,6 +782,7 @@ require('lazy').setup({
           --   end,
           -- },
         },
+        signature = { enabled = true, auto_open = { enabled = false } },
         opts = {},
       },
       'folke/lazydev.nvim',
@@ -790,7 +812,7 @@ require('lazy').setup({
         -- <c-k>: Toggle signature help
         --
         -- See :h blink-cmp-config-keymap for defining your own keymap
-        preset = 'default',
+        preset = 'enter',
 
         -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
         --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
@@ -895,17 +917,9 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
-      -- Autoinstall languages that are not installed
+      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'typescript', 'tsx' },
       auto_install = true,
-      highlight = {
-        enable = true,
-        -- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
-        --  If you are experiencing weird indenting issues, add the language to
-        --  the list of additional_vim_regex_highlighting and disabled languages for indent.
-        additional_vim_regex_highlighting = { 'ruby' },
-      },
-      indent = { enable = true, disable = { 'ruby' } },
+      highlight = { enable = true, additional_vim_regex_highlighting = { 'ruby' } },
     },
     -- There are additional nvim-treesitter modules that you can use to interact
     -- with nvim-treesitter. You should go explore a few and see what interests you:
@@ -914,7 +928,6 @@ require('lazy').setup({
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
-
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
   -- place them in the correct locations.
